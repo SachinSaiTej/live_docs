@@ -6,6 +6,7 @@ import { liveblocks } from '../liveblocks';
 import { revalidatePath } from 'next/cache';
 import { getAccessType, parseStringify } from '../utils';
 import { redirect } from 'next/navigation';
+import { title } from 'process';
 
 export const createDocument = async ({ userId, email }: CreateDocumentParams) => {
     const roomId = nanoid();
@@ -83,7 +84,20 @@ export const updateDocumentAccess = async ({ roomId, email, userType, updatedBy 
 
         const room = await liveblocks.updateRoom(roomId, { usersAccesses });
         if (room) {
-            // TODO : Send a notification to the user
+            const notificationId = nanoid();
+            await liveblocks.triggerInboxNotification({
+                userId: email,
+                kind: '$documentAccess',
+                subjectId: notificationId,
+                activityData: {
+                    userType,
+                    title: `You have been granted ${userType} access to the document by ${updatedBy.name}`,
+                    updatedBy: updatedBy.name,
+                    avatar: updatedBy.avatar,
+                    email: updatedBy.email
+                },
+                roomId
+            })
         }
 
         revalidatePath(`/documents/${roomId}`);
@@ -112,7 +126,7 @@ export const removeCollaborator = async ({ roomId, email }: { roomId: string, em
     }
 }
 
-export const deleteDocument = async (roomId: string)=>{
+export const deleteDocument = async (roomId: string) => {
     try {
         await liveblocks.deleteRoom(roomId);
         revalidatePath("/");
